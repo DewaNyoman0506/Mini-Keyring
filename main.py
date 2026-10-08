@@ -8,6 +8,8 @@ import network
 from umqtt.robust import MQTTClient
 from json import dumps
 
+boot_time = time.ticks_ms()
+
 # Sync NTP =====
 
 def get_time():
@@ -17,6 +19,25 @@ def get_time():
     minute = t[4]
     
     return "{:02d}:{:02d}".format(hour, minute)
+
+# System Uptime =====
+
+def get_uptime():
+    elapsed = time.ticks_diff(time.ticks_ms(), boot_time)
+    
+    seconds = elapsed // 1000
+    minutes = seconds // 60
+    hours = minutes // 60
+    
+    seconds %= 60
+    minutes %= 60
+    
+    return "{:02d}:{:02d}:{:02d}".format(
+        hours,
+        minutes,
+        seconds
+        
+        )
 
 # Buat OLED =====
 i2c = I2C( 0, scl=Pin(22), sda=Pin(21) )
@@ -239,6 +260,125 @@ def wifi_scanner():
         oled.text( str(rssi), 96, y + 8 )
         
         oled.show()
+
+# Random Aquarium Screen =====
+
+FISH = [
+    {
+        "x": 10,
+        "y": 16,
+        "dx": 1,
+        "dy": 0,
+        "speed": 1,
+        "sprite_r": "><>",
+        "sprite_l": "<><"
+    },
+    
+    {
+        "x": 70,
+        "y": 32,
+        "dx": -1,
+        "dy": 0,
+        "speed": 1,
+        "sprite_r": "><((('>",
+        "sprite_l": "<'((()><"
+    },
+    
+    {
+        "x": 35,
+        "y": 48,
+        "dx": 1,
+        "dy": 0,
+        "speed": 2,
+        "sprite_r": "><>",
+        "sprite_l": "<><"
+    },
+    
+    {
+        "x": 100,
+        "y": 8,
+        "dx": -1,
+        "dy": 0,
+        "speed": 1,
+        "sprite_r": "><((('>",
+        "sprite_l": "<'((()><"
+    },
+    
+    {
+        "x": 55,
+        "y": 24,
+        "dx": -1,
+        "dy": 0,
+        "speed": 1,
+        "sprite_r": "><>",
+        "sprite_l": "<><"
+    }
+]
+
+def move_fish(fish):
+    
+    if random.random() < 0.08:
+        fish["dy"] = random.choice ( [ -1, 0, 0, 0, 1 ] )
+        
+    if random.random() < 0.03:
+        fish["dx"] *= -1
+        
+    # Bikin gerak !
+    fish["x"] += fish["dx"] * fish["speed"]
+    fish["y"] += fish["dy"]
+    
+    # Biarin ikan didalem OLED
+    
+    if fish["x"] < 0:
+        fish["x"] = 0
+        fish["dx"] = 1
+        
+    if fish["x"] > 120:
+        fish["x"] = 120
+        fish["dx"] = -1
+        
+    if fish["y"] < 8:
+        fish["y"] = 8
+        fish["dy"] = 1
+        
+    if fish["y"] > 56:
+        fish["y"] = 56
+        fish["dy"] = -1
+        
+def draw_fish(fish):
+    
+    if fish["dx"] > 0:
+        sprite = fish["sprite_r"]
+    else:
+        sprite = fish["sprite_l"]
+            
+    oled.text(
+        sprite,
+        fish["x"],
+        fish["y"]
+        )
+            
+
+def aquarium_screen(duration):
+    start = time.ticks_ms()
+    
+    while time.ticks_diff( time.ticks_ms(), start ) < duration:
+        
+        oled.fill(0)
+        
+        for fish in FISH:
+            move_fish(fish)
+            draw_fish(fish)
+            
+        oled.text(
+            get_uptime(),
+            32,
+            28
+            )
+            
+        oled.show()
+        
+        time.sleep_ms(150)
     
 while True:
     
@@ -254,6 +394,10 @@ while True:
             
             draw_face(True)
             time.sleep(0.15)
+
+    # Aquarium
+    
+    aquarium_screen(10000)
     
     # Sensor screen
     show_data()
